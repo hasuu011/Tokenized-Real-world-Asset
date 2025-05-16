@@ -92,4 +92,4 @@ npx hardhat test
 npx hardhat run scripts/deploy.js --network coreTestnet2
 License
 This project is licensed under the MIT License - see the LICENSE file for details.
-contract address="0xf8e81D47203A594245E36C48e151709F0C19fBe8"
+contract address:"0xf8e81D47203A594245E36C48e151709F0C19fBe8"
