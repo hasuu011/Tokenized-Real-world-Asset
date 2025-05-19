@@ -1,168 +1,297 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
 
 /**
- * @title TokenizedRWA
- * @dev A framework for tokenizing real-world assets with compliance features, 
- * fractional ownership, and automated dividend distributions
+ * @title Tokenized Real World Asset (RWA) Contract
+ * @dev A smart contract for tokenizing real-world assets as NFTs
+ * Each token represents ownership or fractional ownership of a real-world asset
  */
-contract TokenizedRWA is ERC20, Ownable {
-    // Asset details
-    struct AssetDetails {
-        string assetType;        // E.g., "Real Estate", "Commodity", "Art"
-        string assetIdentifier;  // Legal identifier or description
-        string location;         // Physical location if applicable
-        uint256 totalValuation;  // Total valuation in USD (scaled by 10^18)
-        bool isVerified;         // Verification status by designated authority
+contract Project is ERC721, Ownable, ReentrancyGuard {
+    using Counters for Counters.Counter;
+    
+    // Counter for token IDs
+    Counters.Counter private _tokenIds;
+    
+    // Struct to store asset information
+    struct Asset {
+        string name;
+        string description;
+        string location;
+        uint256 totalValue;
+        uint256 shares;
+        uint256 pricePerShare;
+        bool isActive;
+        address creator;
+        string metadataURI;
     }
     
-    AssetDetails public assetDetails;
+    // Mapping from token ID to asset information
+    mapping(uint256 => Asset) public assets;
     
-    // Compliance and investor tracking
-    mapping(address => bool) public whitelisted;
-    mapping(address => bool) public kycCompleted;
-    uint256 public maxInvestors;
-    uint256 public currentInvestorCount;
+    // Mapping from token ID to number of shares owned by address
+    mapping(uint256 => mapping(address => uint256)) public shareholdings;
     
-    // Dividend distribution
-    uint256 public accumulatedDividends;
-    mapping(address => uint256) public lastDividendClaimed;
+    // Mapping from token ID to total shares sold
+    mapping(uint256 => uint256) public sharesSold;
+    
+    // Platform fee percentage (in basis points, e.g., 250 = 2.5%)
+    uint256 public platformFee = 250;
     
     // Events
-    event AssetVerificationUpdated(bool verificationStatus);
-    event DividendDeposited(uint256 amount);
-    event DividendClaimed(address investor, uint256 amount);
-    event InvestorWhitelisted(address investor);
-    event KycCompleted(address investor);
+    event AssetTokenized(
+        uint256 indexed tokenId,
+        string name,
+        uint256 totalValue,
+        uint256 shares,
+        address indexed creator
+    );
+    
+    event SharesPurchased(
+        uint256 indexed tokenId,
+        address indexed buyer,
+        uint256 shares,
+        uint256 totalCost
+    );
+    
+    event AssetUpdated(
+        uint256 indexed tokenId,
+        string newMetadataURI
+    );
+    
+    constructor() ERC721("Tokenized Real World Assets", "TRWA") Ownable(msg.sender) {}
     
     /**
-     * @dev Constructor that sets up the tokenized asset
-     * @param _name Name of the token
-     * @param _symbol Symbol of the token
-     * @param _assetType Type of the real-world asset
-     * @param _assetIdentifier Legal identifier of the asset
-     * @param _location Physical location of the asset
-     * @param _totalValuation Total valuation of the asset in USD (scaled by 10^18)
-     * @param _maxInvestors Maximum number of investors allowed
+     * @dev Core Function 1: Tokenize a real-world asset
+     * @param _name Name of the asset
+     * @param _description Description of the asset
+     * @param _location Location of the asset
+     * @param _totalValue Total value of the asset in wei
+     * @param _shares Total number of shares for fractional ownership
+     * @param _metadataURI URI pointing to asset metadata (images, documents, etc.)
      */
-    constructor(
+    function tokenizeAsset(
         string memory _name,
-        string memory _symbol,
-        string memory _assetType,
-        string memory _assetIdentifier,
+        string memory _description,
         string memory _location,
-        uint256 _totalValuation,
-        uint256 _maxInvestors
-    ) ERC20(_name, _symbol) Ownable(msg.sender) {
-        assetDetails = AssetDetails({
-            assetType: _assetType,
-            assetIdentifier: _assetIdentifier,
+        uint256 _totalValue,
+        uint256 _shares,
+        string memory _metadataURI
+    ) external returns (uint256) {
+        require(_totalValue > 0, "Total value must be greater than 0");
+        require(_shares > 0, "Shares must be greater than 0");
+        require(bytes(_name).length > 0, "Name cannot be empty");
+        
+        _tokenIds.increment();
+        uint256 newTokenId = _tokenIds.current();
+        
+        // Calculate price per share
+        uint256 pricePerShare = _totalValue / _shares;
+        
+        // Create asset struct
+        assets[newTokenId] = Asset({
+            name: _name,
+            description: _description,
             location: _location,
-            totalValuation: _totalValuation,
-            isVerified: false
+            totalValue: _totalValue,
+            shares: _shares,
+            pricePerShare: pricePerShare,
+            isActive: true,
+            creator: msg.sender,
+            metadataURI: _metadataURI
         });
         
-        maxInvestors = _maxInvestors;
-        currentInvestorCount = 0;
-    }
-    
-    /**
-     * @dev Add an investor to the whitelist (KYC required before investment)
-     * @param _investor Address of the investor to whitelist
-     */
-    function whitelistInvestor(address _investor) external onlyOwner {
-        require(!whitelisted[_investor], "Investor already whitelisted");
-        whitelisted[_investor] = true;
-        emit InvestorWhitelisted(_investor);
-    }
-    
-    /**
-     * @dev Update KYC status for an investor
-     * @param _investor Address of the investor
-     * @param _status KYC status (true = completed)
-     */
-    function updateKycStatus(address _investor, bool _status) external onlyOwner {
-        require(whitelisted[_investor], "Investor not whitelisted");
+        // Mint NFT to the creator
+        _safeMint(msg.sender, newTokenId);
         
-        // If this is a new investor, increment the counter
-        if (_status && !kycCompleted[_investor]) {
-            require(currentInvestorCount < maxInvestors, "Maximum investors reached");
-            currentInvestorCount++;
+        emit AssetTokenized(newTokenId, _name, _totalValue, _shares, msg.sender);
+        
+        return newTokenId;
+    }
+    
+    /**
+     * @dev Core Function 2: Purchase fractional shares of a tokenized asset
+     * @param _tokenId ID of the tokenized asset
+     * @param _sharesToBuy Number of shares to purchase
+     */
+    function purchaseShares(uint256 _tokenId, uint256 _sharesToBuy) 
+        external 
+        payable 
+        nonReentrant 
+    {
+        require(_ownerOf(_tokenId) != address(0), "Token does not exist");
+        require(assets[_tokenId].isActive, "Asset is not active");
+        require(_sharesToBuy > 0, "Must purchase at least 1 share");
+        
+        Asset storage asset = assets[_tokenId];
+        
+        // Check if enough shares are available
+        uint256 availableShares = asset.shares - sharesSold[_tokenId];
+        require(_sharesToBuy <= availableShares, "Not enough shares available");
+        
+        // Calculate total cost including platform fee
+        uint256 baseCost = _sharesToBuy * asset.pricePerShare;
+        uint256 fee = (baseCost * platformFee) / 10000;
+        uint256 totalCost = baseCost + fee;
+        
+        require(msg.value >= totalCost, "Insufficient payment");
+        
+        // Update shareholdings
+        shareholdings[_tokenId][msg.sender] += _sharesToBuy;
+        sharesSold[_tokenId] += _sharesToBuy;
+        
+        // Transfer payment to asset creator (minus platform fee)
+        payable(asset.creator).transfer(baseCost);
+        
+        // Transfer platform fee to contract owner
+        if (fee > 0) {
+            payable(owner()).transfer(fee);
         }
         
-        kycCompleted[_investor] = _status;
-        emit KycCompleted(_investor);
+        // Refund excess payment
+        if (msg.value > totalCost) {
+            payable(msg.sender).transfer(msg.value - totalCost);
+        }
+        
+        emit SharesPurchased(_tokenId, msg.sender, _sharesToBuy, totalCost);
     }
     
     /**
-     * @dev Issue tokens to an investor (partial ownership of the asset)
-     * @param _investor Address of the investor
-     * @param _amount Amount of tokens to mint
+     * @dev Core Function 3: Update asset metadata and information
+     * @param _tokenId ID of the tokenized asset
+     * @param _newMetadataURI New metadata URI
      */
-    function issueTokens(address _investor, uint256 _amount) external onlyOwner {
-        require(whitelisted[_investor], "Investor not whitelisted");
-        require(kycCompleted[_investor], "KYC not completed");
+    function updateAssetMetadata(uint256 _tokenId, string memory _newMetadataURI) 
+        external 
+    {
+        require(_ownerOf(_tokenId) != address(0), "Token does not exist");
+        require(
+            msg.sender == assets[_tokenId].creator || msg.sender == owner(),
+            "Only asset creator or contract owner can update metadata"
+        );
         
-        _mint(_investor, _amount);
+        assets[_tokenId].metadataURI = _newMetadataURI;
+        
+        emit AssetUpdated(_tokenId, _newMetadataURI);
     }
     
     /**
-     * @dev Deposit dividends for distribution to token holders
+     * @dev Get basic asset information
+     * @param _tokenId ID of the tokenized asset
      */
-    function depositDividends() external payable onlyOwner {
-        require(msg.value > 0, "Must deposit positive amount");
+    function getAssetBasicInfo(uint256 _tokenId) 
+        external 
+        view 
+        returns (
+            string memory name,
+            string memory description,
+            string memory location,
+            address creator
+        ) 
+    {
+        require(_ownerOf(_tokenId) != address(0), "Token does not exist");
+        Asset storage asset = assets[_tokenId];
         
-        accumulatedDividends += msg.value;
-        emit DividendDeposited(msg.value);
+        return (
+            asset.name,
+            asset.description,
+            asset.location,
+            asset.creator
+        );
     }
     
     /**
-     * @dev Allow token holders to claim their dividends
+     * @dev Get asset financial information
+     * @param _tokenId ID of the tokenized asset
      */
-    function claimDividends() external {
-        uint256 ownerBalance = balanceOf(msg.sender);
-        require(ownerBalance > 0, "No tokens owned");
+    function getAssetFinancialInfo(uint256 _tokenId) 
+        external 
+        view 
+        returns (
+            uint256 totalValue,
+            uint256 shares,
+            uint256 pricePerShare,
+            uint256 soldShares,
+            bool isActive
+        ) 
+    {
+        require(_ownerOf(_tokenId) != address(0), "Token does not exist");
+        Asset storage asset = assets[_tokenId];
         
-        uint256 totalSupplyValue = totalSupply();
-        uint256 dividendShare = (ownerBalance * accumulatedDividends) / totalSupplyValue;
-        
-        // Reset claim tracking
-        lastDividendClaimed[msg.sender] = accumulatedDividends;
-        
-        // Transfer dividends
-        (bool success, ) = payable(msg.sender).call{value: dividendShare}("");
-        require(success, "Dividend transfer failed");
-        
-        emit DividendClaimed(msg.sender, dividendShare);
+        return (
+            asset.totalValue,
+            asset.shares,
+            asset.pricePerShare,
+            sharesSold[_tokenId],
+            asset.isActive
+        );
     }
     
     /**
-     * @dev Update the verification status of the asset
-     * @param _status New verification status
+     * @dev Get shareholding for a specific address and token
+     * @param _tokenId ID of the tokenized asset
+     * @param _holder Address of the shareholder
      */
-    function updateVerificationStatus(bool _status) external onlyOwner {
-        assetDetails.isVerified = _status;
-        emit AssetVerificationUpdated(_status);
+    function getShareholding(uint256 _tokenId, address _holder) 
+        external 
+        view 
+        returns (uint256) 
+    {
+        return shareholdings[_tokenId][_holder];
     }
     
     /**
-     * @dev Override transfer function to enforce compliance
+     * @dev Override tokenURI to return asset metadata
+     * @param _tokenId ID of the token
      */
-    function transfer(address to, uint256 amount) public override returns (bool) {
-        require(whitelisted[to], "Recipient not whitelisted");
-        require(kycCompleted[to], "Recipient KYC not completed");
-        return super.transfer(to, amount);
+    function tokenURI(uint256 _tokenId) 
+        public 
+        view 
+        override 
+        returns (string memory) 
+    {
+        require(_ownerOf(_tokenId) != address(0), "Token does not exist");
+        return assets[_tokenId].metadataURI;
     }
     
     /**
-     * @dev Override transferFrom function to enforce compliance
+     * @dev Set platform fee (only owner)
+     * @param _newFee New platform fee in basis points
      */
-    function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
-        require(whitelisted[to], "Recipient not whitelisted");
-        require(kycCompleted[to], "Recipient KYC not completed");
-        return super.transferFrom(from, to, amount);
+    function setPlatformFee(uint256 _newFee) external onlyOwner {
+        require(_newFee <= 1000, "Platform fee cannot exceed 10%");
+        platformFee = _newFee;
+    }
+    
+    /**
+     * @dev Toggle asset active status (only asset creator or owner)
+     * @param _tokenId ID of the tokenized asset
+     */
+    function toggleAssetStatus(uint256 _tokenId) external {
+        require(_ownerOf(_tokenId) != address(0), "Token does not exist");
+        require(
+            msg.sender == assets[_tokenId].creator || msg.sender == owner(),
+            "Only asset creator or contract owner can toggle status"
+        );
+        
+        assets[_tokenId].isActive = !assets[_tokenId].isActive;
+    }
+    
+    /**
+     * @dev Get total number of tokenized assets
+     */
+    function getTotalAssets() external view returns (uint256) {
+        return _tokenIds.current();
+    }
+    
+    /**
+     * @dev Emergency withdraw function (only owner)
+     */
+    function emergencyWithdraw() external onlyOwner {
+        payable(owner()).transfer(address(this).balance);
     }
 }
