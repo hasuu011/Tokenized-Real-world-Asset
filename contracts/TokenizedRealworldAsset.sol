@@ -25,7 +25,7 @@ contract Project is ERC721, Ownable, ReentrancyGuard {
         uint256 pricePerShare;
         bool isActive;
         address creator;
-        string metadataURI;
+        s
     }
 
     mapping(uint256 => Asset) public assets;
