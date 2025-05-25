@@ -16,7 +16,7 @@ contract Project is ERC721, Ownable, ReentrancyGuard {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 
-    struct Asset {
+
         string name;
         string description;
         string location;
