@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 /**
  * @title Tokenized Real World Asset (RWA) Contract
  * @dev A smart contract for tokenizing real-world assets as NFTs
- * Each token represents ownership or fractional ownership of a real-world asset
+ * Each token represents ownership or fractional ownership of  real-world asset
  */
 contract Project is ERC721, Ownable, ReentrancyGuard {
     using Counters for Counters.Counter;
