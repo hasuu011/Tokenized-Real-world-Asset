@@ -5,8 +5,7 @@ pragma solidity ^0.8.19;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-
+import "@openzeppelin/contracts/utils/Counters.so
 /**
  * @title Tokenized Real World Asset (RWA) Contract
  * @dev A smart contract for tokenizing real-world assets as NFTs
