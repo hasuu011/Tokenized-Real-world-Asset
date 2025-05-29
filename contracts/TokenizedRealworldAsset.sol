@@ -12,9 +12,7 @@ import "@openzeppelin/contracts/utils/Counters.so
  * Each token represents ownership or fractional ownership of  real-world asset
  */
 contract Project is ERC721, Ownable, ReentrancyGuard {
-    using Counters for Counters.Counter;
-    
-
+    using Counters for Counters.Counte
         string name;
         string description;
         string location;
