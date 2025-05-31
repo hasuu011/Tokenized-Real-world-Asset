@@ -1,43 +1,55 @@
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Counters.so
+import "@openzeppelin/contracts/utils/Counters.sol";
+
 /**
  * @title Tokenized Real World Asset (RWA) Contract
  * @dev A smart contract for tokenizing real-world assets as NFTs
- * Each token represents ownership or fractional ownership of  real-world asset
+ * Each token represents ownership or fractional ownership of a real-world asset
  */
 contract Project is ERC721, Ownable, ReentrancyGuard {
-    using Counters for Counters.Counte
+    using Counters for Counters.Counter;
+    Counters.Counter private _tokenIds;
+
+    struct Asset {
         string name;
         string description;
         string location;
-        uint256 totalValue;
-        uint256 shares;
-        uint256 pricePerShare;
-        bool isActive;
-        address creator;
-        s
+        uint256 totalValue;      // Total valuation of asset in wei
+        uint256 shares;          // Total shares issued
+        uint256 pricePerShare;   // Price per share in wei
+        bool isActive;           // Is asset currently active/listed
+        address creator;         // Creator of the asset NFT
+        string metadataURI;      // Metadata URI (e.g. IPFS link)
     }
 
+    // Mapping tokenId to Asset
     mapping(uint256 => Asset) public assets;
+
+    // Mapping tokenId => (holder address => shares owned)
     mapping(uint256 => mapping(address => uint256)) public shareholdings;
+
+    // Number of shares sold per tokenId
     mapping(uint256 => uint256) public sharesSold;
+
+    // Platform fee in basis points (parts per 10,000), e.g. 250 = 2.5%
     uint256 public platformFee = 250;
 
+    // List of all token IDs minted
     uint256[] private tokenList;
 
+    // Events
     event AssetTokenized(uint256 indexed tokenId, string name, uint256 totalValue, uint256 shares, address indexed creator);
     event SharesPurchased(uint256 indexed tokenId, address indexed buyer, uint256 shares, uint256 totalCost);
     event AssetUpdated(uint256 indexed tokenId, string newMetadataURI);
     event SharesTransferred(uint256 indexed tokenId, address indexed from, address indexed to, uint256 shares);
     event AssetBurned(uint256 indexed tokenId);
 
-    constructor() ERC721("Tokenized Real World Assets", "TRWA") Ownable(msg.sender) {}
+    constructor() ERC721("Tokenized Real World Assets", "TRWA") {}
 
     function tokenizeAsset(
         string memory _name,
@@ -52,6 +64,7 @@ contract Project is ERC721, Ownable, ReentrancyGuard {
 
         _tokenIds.increment();
         uint256 newTokenId = _tokenIds.current();
+
         uint256 pricePerShare = _totalValue / _shares;
 
         assets[newTokenId] = Asset({
@@ -68,19 +81,20 @@ contract Project is ERC721, Ownable, ReentrancyGuard {
 
         tokenList.push(newTokenId);
         _safeMint(msg.sender, newTokenId);
+
         emit AssetTokenized(newTokenId, _name, _totalValue, _shares, msg.sender);
 
         return newTokenId;
     }
 
     function purchaseShares(uint256 _tokenId, uint256 _sharesToBuy) external payable nonReentrant {
-        require(_ownerOf(_tokenId) != address(0), "Token doesn't exist");
+        require(_exists(_tokenId), "Token doesn't exist");
         require(assets[_tokenId].isActive, "Asset inactive");
-        require(_sharesToBuy > 0, "Shares > 0");
+        require(_sharesToBuy > 0, "Shares must be > 0");
 
         Asset storage asset = assets[_tokenId];
         uint256 availableShares = asset.shares - sharesSold[_tokenId];
-        require(_sharesToBuy <= availableShares, "Not enough shares");
+        require(_sharesToBuy <= availableShares, "Not enough shares available");
 
         uint256 baseCost = _sharesToBuy * asset.pricePerShare;
         uint256 fee = (baseCost * platformFee) / 10000;
@@ -92,14 +106,21 @@ contract Project is ERC721, Ownable, ReentrancyGuard {
         sharesSold[_tokenId] += _sharesToBuy;
 
         payable(asset.creator).transfer(baseCost);
-        if (fee > 0) payable(owner()).transfer(fee);
-        if (msg.value > totalCost) payable(msg.sender).transfer(msg.value - totalCost);
+
+        if (fee > 0) {
+            payable(owner()).transfer(fee);
+        }
+
+        // Refund excess payment if any
+        if (msg.value > totalCost) {
+            payable(msg.sender).transfer(msg.value - totalCost);
+        }
 
         emit SharesPurchased(_tokenId, msg.sender, _sharesToBuy, totalCost);
     }
 
     function updateAssetMetadata(uint256 _tokenId, string memory _newMetadataURI) external {
-        require(_ownerOf(_tokenId) != address(0), "Token doesn't exist");
+        require(_exists(_tokenId), "Token doesn't exist");
         require(msg.sender == assets[_tokenId].creator || msg.sender == owner(), "Unauthorized");
 
         assets[_tokenId].metadataURI = _newMetadataURI;
@@ -107,13 +128,13 @@ contract Project is ERC721, Ownable, ReentrancyGuard {
     }
 
     function getAssetBasicInfo(uint256 _tokenId) external view returns (string memory, string memory, string memory, address) {
-        require(_ownerOf(_tokenId) != address(0), "Token doesn't exist");
+        require(_exists(_tokenId), "Token doesn't exist");
         Asset storage asset = assets[_tokenId];
         return (asset.name, asset.description, asset.location, asset.creator);
     }
 
     function getAssetFinancialInfo(uint256 _tokenId) external view returns (uint256, uint256, uint256, uint256, bool) {
-        require(_ownerOf(_tokenId) != address(0), "Token doesn't exist");
+        require(_exists(_tokenId), "Token doesn't exist");
         Asset storage asset = assets[_tokenId];
         return (asset.totalValue, asset.shares, asset.pricePerShare, sharesSold[_tokenId], asset.isActive);
     }
@@ -123,7 +144,7 @@ contract Project is ERC721, Ownable, ReentrancyGuard {
     }
 
     function tokenURI(uint256 _tokenId) public view override returns (string memory) {
-        require(_ownerOf(_tokenId) != address(0), "Token doesn't exist");
+        require(_exists(_tokenId), "Token doesn't exist");
         return assets[_tokenId].metadataURI;
     }
 
@@ -133,8 +154,9 @@ contract Project is ERC721, Ownable, ReentrancyGuard {
     }
 
     function toggleAssetStatus(uint256 _tokenId) external {
-        require(_ownerOf(_tokenId) != address(0), "Token doesn't exist");
+        require(_exists(_tokenId), "Token doesn't exist");
         require(msg.sender == assets[_tokenId].creator || msg.sender == owner(), "Unauthorized");
+
         assets[_tokenId].isActive = !assets[_tokenId].isActive;
     }
 
@@ -157,12 +179,13 @@ contract Project is ERC721, Ownable, ReentrancyGuard {
     }
 
     function burnAsset(uint256 _tokenId) external {
-        require(_ownerOf(_tokenId) != address(0), "Token doesn't exist");
+        require(_exists(_tokenId), "Token doesn't exist");
         require(msg.sender == assets[_tokenId].creator || msg.sender == owner(), "Unauthorized");
 
         _burn(_tokenId);
         delete assets[_tokenId];
         delete sharesSold[_tokenId];
+
         emit AssetBurned(_tokenId);
     }
 
@@ -174,6 +197,7 @@ contract Project is ERC721, Ownable, ReentrancyGuard {
         uint256 count = _tokenIds.current();
         uint256[] memory ids = new uint256[](count);
         uint256[] memory shares = new uint256[](count);
+
         for (uint256 i = 1; i <= count; i++) {
             ids[i - 1] = i;
             shares[i - 1] = shareholdings[i][user];
