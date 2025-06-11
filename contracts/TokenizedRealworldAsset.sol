@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
  * Each token represents ownership or fractional ownership of a real-world asset
  */
 contract Project is ERC721, Ownable, ReentrancyGuard {
-    using Counters for Counters.Counter;
+    using Counters for Counters.Counter
     Counters.Counter private _tokenIds;
 
     struct Asset {
