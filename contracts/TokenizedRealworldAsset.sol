@@ -61,8 +61,7 @@ contract Project is ERC721, Ownable, ReentrancyGuard {
         require(bytes(_name).length > 0, "Name required");
 
         _tokenIds.increment();
-        uint256 newTokenId = _tokenIds.current();
-
+    
         uint256 pricePerShare = _totalValue / _shares;
 
         assets[newTokenId] = Asset({
