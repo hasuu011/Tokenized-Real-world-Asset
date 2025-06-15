@@ -12,17 +12,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
  */
 contract Project is ERC721, Ownable, ReentrancyGuard {
     
-    struct Asset {
-        string name;
-        string description;
-        string location;
-        uint256 totalValue;      // Total valuation of asset in wei
-        uint256 shares;          // Total shares issued
-        uint256 pricePerShare;   // Price per share in wei
-        bool isActive;           // Is asset currently active/listed
-        address creator;         // Creator of the asset NFT
-        string metadataURI;      // Metadata URI (e.g. IPFS link)
-    }
+  
 
     // Mapping tokenId to Asset
     mapping(uint256 => Asset) public assets;
