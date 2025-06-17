@@ -10,9 +10,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
  * @dev A smart contract for tokenizing real-world assets as NFTs
  * Each token represents ownership or fractional ownership of a real-world asset
  */
-contract Project is ERC721, Ownable, ReentrancyGuard
-    
-  
+contract Project is ERC721, Ownable
 
     // Mapping tokenId to Asset
     mapping(uint256 => Asset) public assets;
