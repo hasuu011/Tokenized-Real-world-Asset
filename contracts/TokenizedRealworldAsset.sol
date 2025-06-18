@@ -15,7 +15,7 @@ contract Project is ERC721, Ownable
     // Mapping tokenId to Asset
     mapping(uint256 => Asset) public assets;
 
-    // Mapping tokenId => (holder address => shares owned)
+    // Mapping tokenId => (holder=> shares owned)
     mapping(uint256 => mapping(address => uint256)) public shareholdings;
 
     // Number of shares sold per tokenId
