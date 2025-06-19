@@ -49,19 +49,7 @@ contract Project is ERC721, Ownable
 
         _tokenIds.increment();
     
-        uint256 pricePerShare = _totalValue / _shares;
-
-        assets[newTokenId] = Asset({
-            name: _name,
-            description: _description,
-            location: _location,
-            totalValue: _totalValue,
-            shares: _shares,
-            pricePerShare: pricePerShare,
-            isActive: true,
-            creator: msg.sender,
-            metadataURI: _metadataURI
-        });
+        uint256 pricePerShare = _totalValue / _shares
 
         tokenList.push(newTokenId);
         _safeMint(msg.sender, newTokenId);
