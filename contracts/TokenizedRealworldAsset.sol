@@ -64,10 +64,7 @@ contract Project is ERC721, Ownable
         require(assets[_tokenId].isActive, "Asset inactive");
         require(_sharesToBuy > 0, "Shares must be > 0");
 
-        Asset storage asset = assets[_tokenId];
-        uint256 availableShares = asset.shares - sharesSold[_tokenId];
-        require(_sharesToBuy <= availableShares, "Not enough shares available");
-
+  
         uint256 baseCost = _sharesToBuy * asset.pricePerShare;
         uint256 fee = (baseCost * platformFee) / 10000;
         uint256 totalCost = baseCost + fee;
