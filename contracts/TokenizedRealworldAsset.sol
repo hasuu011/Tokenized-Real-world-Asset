@@ -49,14 +49,7 @@ contract Project is ERC721, Ownable
 
         _tokenIds.increment();
     
-        uint256 pricePerShare = _totalValue / _shares
-
-        tokenList.push(newTokenId);
-        _safeMint(msg.sender, newTokenId);
-
-        emit AssetTokenized(newTokenId, _name, _totalValue, _shares, msg.sender);
-
-        return newTokenId;
+  
     }
 
     function purchaseShares(uint256 _tokenId, uint256 _sharesToBuy) external payable nonReentrant {
