@@ -5,12 +5,27 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+
 /*
  * @title Tokenized Real World Asset (RWA) Contract
  * @dev A smart contract for tokenizing real-world assets as NFTs
  * Each token represents ownership or fractional ownership of a real-world asset
  */
-contract Project is ERC721, Ownable
+contract Project is ERC721, Ownable, ReentrancyGuard {
+    using Counters for Counters.Counter;
+    Counters.Counter private _tokenIds;
+
+    struct Asset {
+        string name;
+        string description;
+        string location;
+        uint256 totalValue;
+        uint256 shares;
+        uint256 pricePerShare;
+        string metadataURI;
+        bool isActive;
+        address creator;
+    }
 
     // Mapping tokenId to Asset
     mapping(uint256 => Asset) public assets;
@@ -48,8 +63,27 @@ contract Project is ERC721, Ownable
         require(bytes(_name).length > 0, "Name required");
 
         _tokenIds.increment();
-    
-  
+        uint256 newTokenId = _tokenIds.current();
+
+        uint256 pricePerShare = _totalValue / _shares;
+
+        assets[newTokenId] = Asset({
+            name: _name,
+            description: _description,
+            location: _location,
+            totalValue: _totalValue,
+            shares: _shares,
+            pricePerShare: pricePerShare,
+            metadataURI: _metadataURI,
+            isActive: true,
+            creator: msg.sender
+        });
+
+        _safeMint(msg.sender, newTokenId);
+        tokenList.push(newTokenId);
+
+        emit AssetTokenized(newTokenId, _name, _totalValue, _shares, msg.sender);
+        return newTokenId;
     }
 
     function purchaseShares(uint256 _tokenId, uint256 _sharesToBuy) external payable nonReentrant {
@@ -57,7 +91,9 @@ contract Project is ERC721, Ownable
         require(assets[_tokenId].isActive, "Asset inactive");
         require(_sharesToBuy > 0, "Shares must be > 0");
 
-  
+        Asset storage asset = assets[_tokenId];
+        require(sharesSold[_tokenId] + _sharesToBuy <= asset.shares, "Not enough shares left");
+
         uint256 baseCost = _sharesToBuy * asset.pricePerShare;
         uint256 fee = (baseCost * platformFee) / 10000;
         uint256 totalCost = baseCost + fee;
@@ -73,7 +109,6 @@ contract Project is ERC721, Ownable
             payable(owner()).transfer(fee);
         }
 
-        // Refund excess payment if any
         if (msg.value > totalCost) {
             payable(msg.sender).transfer(msg.value - totalCost);
         }
