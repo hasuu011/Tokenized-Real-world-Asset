@@ -1,4 +1,4 @@
-Mapping tokenId to Asset
+Mapping tokenId to Asset 
     mapping(uint256 => Asset) public assets;
 
     Number of shares sold per tokenId
@@ -6,6 +6,7 @@ Mapping tokenId to Asset
 
     List of all token IDs minted
     uint256[] private tokenList;
+
 
     START
 Updated on 2025-10-24
