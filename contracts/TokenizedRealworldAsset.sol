@@ -1,20 +1,4 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.26;
-
-/**
- * @title Tokenized Real-World Asset (RWA)
- * @notice A smart contract that allows tokenization of real-world assets such as real estate,
- *         artwork, or commodities into fractional ERC20-like ownership tokens.
- */
-contract Project {
-    address public admin;
-    uint256 public assetCount;
-
-    struct Asset {
-        uint256 id;
-        string name;
-        string assetType;
-        string documentHash; // IPFS or SHA256 hash for proof of ownership
+IPFS or SHA256 hash for proof of ownership
         uint256 totalShares;
         uint256 pricePerShare;
         bool verified;
@@ -22,7 +6,7 @@ contract Project {
     }
 
     mapping(uint256 => Asset) public assets;
-    mapping(uint256 => mapping(address => uint256)) public ownership; // assetId → (owner → shares)
+    mapping(uint256 => mapping(address => uint256)) public ownership; // assetId ? (owner ? shares)
 
     event AssetTokenized(
         uint256 indexed id,
@@ -128,3 +112,6 @@ contract Project {
         return ownership[_assetId][_owner];
     }
 }
+// 
+End
+// 
