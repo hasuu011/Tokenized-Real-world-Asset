@@ -8,6 +8,7 @@ IPFS or SHA256 hash for proof of ownership
     mapping(uint256 => Asset) public assets;
     mapping(uint256 => mapping(address => uint256)) public ownership; End
 End
+End
 // 
 // 
 End
